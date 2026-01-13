@@ -1,60 +1,38 @@
-// ⚠️ WARNING: This is a CLIENT-SIDE ONLY mock implementation for development.
-// DO NOT use in production! This is NOT secure and can be easily manipulated.
-// For production, integrate with a proper backend authentication system.
+// src/lib/auth.ts
+import { api } from "@/services/api";
 
-export type UserRole = "admin" | "user";
-
-export interface AuthUser {
+type User = {
   id: string;
-  name: string;
+  nome: string;
   email: string;
-  role: UserRole;
-}
-
-const STORAGE_KEY = "auth_user";
+  tipo: "ADMIN" | "OPERADOR";
+};
 
 export const authService = {
-  login: (email: string, password: string): AuthUser | null => {
-    // Mock authentication - DO NOT USE IN PRODUCTION
-    if (email === "admin@system.com" && password === "admin123") {
-      const user: AuthUser = {
-        id: "1",
-        name: "Admin User",
-        email: "admin@system.com",
-        role: "admin",
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      return user;
-    }
-    if (email === "user@system.com" && password === "user123") {
-      const user: AuthUser = {
-        id: "2",
-        name: "Regular User",
-        email: "user@system.com",
-        role: "user",
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      return user;
-    }
-    return null;
+  async login(email: string, senha: string): Promise<User> {
+    const { data } = await api.post("/auth/login", { email, senha });
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    return data.user;
   },
 
-  logout: () => {
-    localStorage.removeItem(STORAGE_KEY);
+  logout() {
+    localStorage.clear();
   },
 
-  getCurrentUser: (): AuthUser | null => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return null;
-    }
+  getUser(): User | null {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
   },
 
-  isAdmin: (): boolean => {
-    const user = authService.getCurrentUser();
-    return user?.role === "admin";
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem("token");
+  },
+
+  isAdmin(): boolean {
+    const user = this.getUser();
+    return user?.tipo === "ADMIN";
   },
 };

@@ -41,7 +41,8 @@ All colors MUST be HSL.
 
     /* Premium gradients */
     --gradient-gold: linear-gradient(135deg, hsl(43 59% 51%), hsl(42 46% 54%));
-    --gradient-dark: linear-gradient(180deg, hsl(0 0% 10%), hsl(0 0% 4%));
+    --gradient-dark: linear-gradient(180deg, #071e30, #04121d);
+
     
     /* Premium shadows */
     --shadow-gold: 0 4px 20px hsl(43 59% 51% / 0.15);

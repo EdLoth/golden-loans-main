@@ -1,87 +1,211 @@
+"use client";
+
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+
 import { Card } from "@/components/ui/card";
-import { 
-  TrendingUp, 
-  DollarSign, 
-  FileText, 
+import {
+  TrendingUp,
+  DollarSign,
+  FileText,
   AlertCircle,
-  Calendar,
-  Users
+  Users,
+  DollarSignIcon,
 } from "lucide-react";
 
+import DateRangePicker, {
+  type DateRange,
+} from "@/components/DateRangePicker";
+import { getDashboardSummary } from "@/services/dashboard";
+
+import NewContractSheet from "@/components/NewContractSheet";
+import ClientSheet from "@/components/NewClientSheet";
+import { Button } from "@/components/ui/button";
+
+/* =======================
+   GLOBAL DATE RANGE
+======================= */
+
+import { useDateRange } from "@/hooks/useDateRange";
+
+/* =======================
+   COMPONENT
+======================= */
+
 const Dashboard = () => {
+  const { range, setRange } = useDateRange();
+
+  const canFetch = useMemo(() => {
+    if (!range.from || !range.to) return false;
+
+    const from = new Date(range.from);
+    const to = new Date(range.to);
+
+    return (
+      !Number.isNaN(from.getTime()) &&
+      !Number.isNaN(to.getTime()) &&
+      from <= to
+    );
+  }, [range]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-summary", range.from, range.to],
+    queryFn: () =>
+      getDashboardSummary({
+        startDate: new Date(range.from).toISOString(),
+        endDate: new Date(range.to).toISOString(),
+      }),
+    enabled: canFetch,
+  });
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+
+  if (isLoading || !data) {
+    return (
+      <div className="min-h-screen bg-gradient-dark p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* HEADER LOADING */}
+          <div className="flex items-center justify-between animate-pulse">
+            <div className="space-y-2">
+              <div className="h-8 w-48 bg-muted rounded-md" />
+              <div className="h-4 w-32 bg-muted/50 rounded-md" />
+            </div>
+            <div className="h-10 w-64 bg-muted rounded-md" />
+          </div>
+
+          {/* STATS LOADING - 4 CARDS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="p-6 bg-card/50 border-primary/20 shadow-lg animate-pulse">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-3 flex-1">
+                    <div className="h-4 w-24 bg-muted rounded" />
+                    <div className="h-8 w-32 bg-muted rounded" />
+                    <div className="h-4 w-16 bg-muted rounded" />
+                  </div>
+                  <div className="w-12 h-12 rounded-lg bg-muted flex-shrink-0" />
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* CONTENT GRID LOADING */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* RECENT CONTRACTS SKELETON */}
+            <Card className="lg:col-span-2 p-6 bg-card/50 border-primary/20 shadow-lg animate-pulse">
+              <div className="flex items-center justify-between mb-6">
+                <div className="h-6 w-40 bg-muted rounded" />
+                <div className="h-5 w-5 bg-muted rounded" />
+              </div>
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-muted/20">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-muted" />
+                      <div className="space-y-2">
+                        <div className="h-4 w-32 bg-muted rounded" />
+                        <div className="h-3 w-20 bg-muted rounded" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-24 bg-muted rounded ml-auto" />
+                      <div className="h-3 w-16 bg-muted rounded ml-auto" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* QUICK ACTIONS SKELETON */}
+            <Card className="p-6 bg-card/50 border-primary/20 shadow-lg animate-pulse">
+              <div className="h-6 w-32 bg-muted rounded mb-6" />
+              <div className="space-y-3">
+                <div className="h-[60px] w-full bg-muted rounded-lg" />
+                <div className="h-[60px] w-full bg-muted rounded-lg" />
+                <div className="h-[60px] w-full bg-muted rounded-lg" />
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const stats = [
     {
-      title: "Total a Receber",
-      value: "R$ 125.450,00",
+      title: "Total Emprestado",
+      value: formatCurrency(data.totalToReceive),
       icon: DollarSign,
-      trend: "+12.5%",
+      trend: "Em aberto",
       trendUp: true,
     },
     {
       title: "Contratos Ativos",
-      value: "28",
+      value: String(data.activeContracts),
       icon: FileText,
-      trend: "+3",
+      trend: "Ativos",
       trendUp: true,
     },
     {
       title: "Previsão de Juros",
-      value: "R$ 18.750,00",
+      value: formatCurrency(data.monthlyInterestForecast),
       icon: TrendingUp,
-      trend: "Este mês",
+      trend: "No período",
       trendUp: true,
     },
     {
-      title: "Próximos Vencimentos",
-      value: "7",
+      title: "Montante a Receber",
+      value: formatCurrency(data.totalMontanteToReceive),
       icon: AlertCircle,
-      trend: "Próximos 7 dias",
-      trendUp: false,
+      trend: "No período",
+      trendUp: data.totalMontanteToReceive > 0,
     },
-  ];
-
-  const recentContracts = [
-    { id: 1, client: "João Silva", value: "R$ 5.000,00", date: "15/11/2025", status: "Ativo" },
-    { id: 2, client: "Maria Santos", value: "R$ 8.500,00", date: "18/11/2025", status: "Ativo" },
-    { id: 3, client: "Pedro Costa", value: "R$ 3.200,00", date: "20/11/2025", status: "Pendente" },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-dark p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
+        {/* HEADER */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Visão geral do sistema</p>
+            <p className="text-muted-foreground mt-1">
+              Visão geral do sistema
+            </p>
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="w-5 h-5" />
-            <span>21 de Novembro, 2025</span>
-          </div>
+
+          {/* 🔥 FILTRO GLOBAL */}
+          <DateRangePicker value={range} onApply={setRange} />
         </div>
 
-        {/* Stats Grid */}
+        {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat, index) => (
             <Card
               key={index}
-              className="p-6 bg-card border-primary/20 hover:border-primary/40 transition-colors shadow-lg"
+              className="p-6 bg-card/50 border-primary/20 shadow-lg"
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{stat.title}</p>
-                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`text-sm font-medium ${
-                        stat.trendUp ? "text-primary" : "text-accent"
-                      }`}
-                    >
-                      {stat.trend}
-                    </span>
-                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {stat.title}
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {stat.value}
+                  </p>
+                  <span
+                    className={`text-sm font-medium ${
+                      stat.trendUp ? "text-primary" : "text-accent"
+                    }`}
+                  >
+                    {stat.trend}
+                  </span>
                 </div>
+
                 <div className="w-12 h-12 rounded-lg bg-gradient-gold flex items-center justify-center shadow-gold">
                   <stat.icon className="w-6 h-6 text-primary-foreground" />
                 </div>
@@ -90,31 +214,48 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* Main Content Grid */}
+        {/* RECENT CONTRACTS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Contracts */}
-          <Card className="lg:col-span-2 p-6 bg-card border-primary/20 shadow-lg">
+          <Card className="lg:col-span-2 p-6 bg-card/50 border-primary/20 shadow-lg">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-foreground">Contratos Recentes</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                Contratos Recentes
+              </h2>
               <FileText className="w-5 h-5 text-primary" />
             </div>
+
             <div className="space-y-4">
-              {recentContracts.map((contract) => (
+              {data.recentContracts.length === 0 && (
+                <p className="text-muted-foreground">
+                  Nenhum contrato no período
+                </p>
+              )}
+
+              {data.recentContracts.map((contract) => (
                 <div
                   key={contract.id}
-                  className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors border border-border/50"
+                  className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-border/50"
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-gradient-gold flex items-center justify-center">
                       <Users className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{contract.client}</p>
-                      <p className="text-sm text-muted-foreground">{contract.date}</p>
+                      <p className="font-medium text-foreground">
+                        {contract.clientName}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(contract.vencimentoEm).toLocaleDateString(
+                          "pt-BR"
+                        )}
+                      </p>
                     </div>
                   </div>
+
                   <div className="text-right">
-                    <p className="font-semibold text-primary">{contract.value}</p>
+                    <p className="font-semibold text-primary">
+                      {formatCurrency(contract.valorPrincipal)}
+                    </p>
                     <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
                       {contract.status}
                     </span>
@@ -124,22 +265,27 @@ const Dashboard = () => {
             </div>
           </Card>
 
-          {/* Quick Actions */}
-          <Card className="p-6 bg-card border-primary/20 shadow-lg">
-            <h2 className="text-xl font-semibold text-foreground mb-6">Ações Rápidas</h2>
+          {/* QUICK ACTIONS */}
+          <Card className="p-6 bg-card/50 border-primary/20 shadow-lg">
+            <h2 className="text-xl font-semibold text-foreground mb-6">
+              Ações Rápidas
+            </h2>
+
             <div className="space-y-3">
-              <button className="w-full p-4 rounded-lg bg-gradient-gold hover:opacity-90 text-primary-foreground font-medium transition-all shadow-gold">
-                Novo Contrato
-              </button>
-              <button className="w-full p-4 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground font-medium transition-colors border border-border/50">
-                Cadastrar Cliente
-              </button>
-              <button className="w-full p-4 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground font-medium transition-colors border border-border/50">
+              <NewContractSheet
+                triggerLabel="Novo Contrato"
+                classButton="w-full p-4 py-7 text-white rounded-lg bg-secondary border border-border/50"
+              />
+
+              <ClientSheet
+                triggerLabel="Cadastrar Cliente"
+                classButton="w-full p-4 py-7 text-white rounded-lg bg-secondary border border-border/50"
+              />
+
+              <Button className="w-full p-4 py-7 text-white rounded-lg bg-secondary border border-border/50">
+                <DollarSignIcon className="w-5 h-5" />
                 Registrar Gasto
-              </button>
-              <button className="w-full p-4 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground font-medium transition-colors border border-border/50">
-                Ver Relatórios
-              </button>
+              </Button>
             </div>
           </Card>
         </div>
