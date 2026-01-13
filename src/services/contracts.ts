@@ -155,3 +155,12 @@ export const getContractsByClient = async (
   );
   return data;
 };
+
+/**
+ * Dispara manualmente a notificação do Andrade (WhatsApp) para o cliente deste contrato.
+ * POST /finance/contracts/:id/notify
+ */
+export const notifyContractClient = async (id: string): Promise<{ message: string }> => {
+  const { data } = await api.post<{ message: string }>(`/finance/contracts/${id}/notify`);
+  return data;
+};
