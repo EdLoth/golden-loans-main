@@ -12,6 +12,18 @@ export type ContractStatus =
   | "COBRANCA_PESSOAL";
 
 export type ContractPeriodicity = "DAILY" | "WEEKLY" | "MONTHLY";
+export type InstallmentStatus = "PENDENTE" | "PAGO";
+
+/* ✅ NOVO: TIPO DA PARCELA */
+export type ContractInstallment = {
+  id: string;
+  numeroParcela: number;
+  taxa: number;
+  valor: string;        // Vem como string do Decimal do banco
+  dataVencimento: string;
+  status: InstallmentStatus;
+  dataPagamento?: string | null;
+};
 
 /* ===== CLIENT ===== */
 
@@ -37,7 +49,7 @@ export type PaymentHistory = {
   valorPago: number;
   pagoJuros: number;
   pagoPrincipal: number;
-  pagoTaxa: number;        // ✅ NOVO: Campo para registrar quanto de taxa foi pago
+  pagoTaxa: number;
   multaCobrada: number;
 
   dataPagamento: string;
@@ -61,7 +73,7 @@ export type Contract = {
   valorPrincipal: string;
   valorEmAberto: string;
   
-  taxa: string;            // ✅ NOVO: Campo para a taxa pendente do ciclo (Andrade)
+  taxa: string;
 
   jurosPercent: string;
   vencimentoEm: string;
@@ -80,11 +92,14 @@ export type Contract = {
   /** relations */
   client?: Client;
   payments?: PaymentHistory[];
+  
+  // ✅ NOVO: Lista de parcelas (para Diário/Semanal)
+  installments?: ContractInstallment[]; 
 };
 
 /* ===== INPUT ===== */
 /**
- * ⚠️ ESPELHA EXATAMENTE O BACKEND
+ * ⚠️ O Input não muda, pois o backend calcula as parcelas sozinho
  */
 export type ContractInput = {
   clientId: string;
@@ -128,18 +143,21 @@ export const getContractById = async (id: string): Promise<Contract> => {
   return data;
 };
 
-// Tipagem para o Summary (que agora inclui taxaPendente)
+// Tipagem para o Summary
 export type ContractSummary = {
   contractId: string;
   status: ContractStatus;
   principalEmAberto: number;
-  taxaPendente: number;    // ✅ NOVO: Incluído no resumo financeiro
+  taxaPendente: number;
   jurosDoMes: number;
   diasAtraso: number;
   multa: number;
   totalMes: number;
   totalComMulta: number;
   vencimentoEm: string;
+  
+  // ✅ NOVO: O Summary agora retorna as parcelas para você mostrar na tela de pagamento
+  installments?: ContractInstallment[]; 
 };
 
 export const getContractSummary = async (id: string): Promise<ContractSummary> => {
@@ -156,10 +174,13 @@ export const getContractsByClient = async (
   return data;
 };
 
-/**
- * Dispara manualmente a notificação do Andrade (WhatsApp) para o cliente deste contrato.
- * POST /finance/contracts/:id/notify
- */
+
+export async function deleteContract(id: string) {
+  const { data } = await api.delete(`/contracts/${id}`);
+  return data;
+}
+
+
 export const notifyContractClient = async (id: string): Promise<{ message: string }> => {
   const { data } = await api.post<{ message: string }>(`/finance/contracts/${id}/notify`);
   return data;

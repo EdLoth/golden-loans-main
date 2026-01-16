@@ -1,21 +1,18 @@
 import { Card } from "@/components/ui/card";
-import { Wallet, Percent, TrendingUp } from "lucide-react";
+import { Wallet, Percent, TrendingUp, CheckCircle2 } from "lucide-react";
 
 type Props = {
-  type: "TOTAL_EMPRESTADO" | "JUROS_A_RECEBER" | "MONTANTE_TOTAL";
+  type: "TOTAL_EMPRESTADO" | "JUROS_A_RECEBER" | "MONTANTE_TOTAL" | "TOTAL_RECEBIDO";
   value: number;
-  feeValue?: number; // Valor das taxas
+  subInfo?: any; // Objeto com os detalhes vindos do back-end
 };
 
-export default function FinanceSummaryCard({ type, value, feeValue = 0 }: Props) {
+export default function FinanceSummaryCard({ type, value, subInfo }: Props) {
   const format = (v: number) =>
     new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
     }).format(v);
-
-  // Label dinâmica: se houver taxa, mostra "Juros + Taxas"
-  const jurosLabel = feeValue > 0 ? "Juros + Taxas" : "Juros a Receber";
 
   const config = {
     TOTAL_EMPRESTADO: {
@@ -23,12 +20,16 @@ export default function FinanceSummaryCard({ type, value, feeValue = 0 }: Props)
       icon: <Wallet className="w-5 h-5 text-blue-500" />,
     },
     JUROS_A_RECEBER: {
-      label: jurosLabel,
+      label: "Juros + Taxas a Receber",
       icon: <Percent className="w-5 h-5 text-yellow-500" />,
     },
     MONTANTE_TOTAL: {
-      label: "Montante Real (Pago + Aberto)",
-      icon: <TrendingUp className="w-5 h-5 text-green-500" />,
+      label: "Montante a Receber (No Período)",
+      icon: <TrendingUp className="w-5 h-5 text-orange-500" />,
+    },
+    TOTAL_RECEBIDO: {
+      label: "Total Recebido (No Período)",
+      icon: <CheckCircle2 className="w-5 h-5 text-green-500" />,
     },
   }[type];
 
@@ -38,21 +39,51 @@ export default function FinanceSummaryCard({ type, value, feeValue = 0 }: Props)
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
           {config.label}
         </p>
-        <div className="p-2 bg-white/5 rounded-lg">
-          {config.icon}
-        </div>
+        <div className="p-2 bg-white/5 rounded-lg">{config.icon}</div>
       </div>
 
       <div className="mt-4">
-        <p className="text-3xl font-bold tracking-tight text-white">
+        <p className="text-2xl font-bold tracking-tight text-white">
           {format(value)}
         </p>
-        
-        {/* Detalhamento de Juros e Taxas no card específico */}
-        {type === "JUROS_A_RECEBER" && feeValue > 0 && (
-          <div className="mt-2 flex gap-2 text-[10px] text-muted-foreground font-medium border-t border-white/5 pt-2">
-            <span>Juros: {format(value - feeValue)}</span>
-            <span className="text-blue-400">Taxas: {format(feeValue)}</span>
+
+        {/* ÁREA DE DETALHAMENTO (SUB-INFOS) */}
+        {subInfo && (
+          <div className="mt-2 flex flex-col gap-1 text-[10px] text-muted-foreground font-medium border-t border-white/5 pt-2">
+            
+            {/* Detalhes para Total Emprestado */}
+            {type === "TOTAL_EMPRESTADO" && (
+              <>
+                <div className="flex justify-between"><span>Diário:</span><span className="text-white">{format(subInfo.diario)}</span></div>
+                <div className="flex justify-between"><span>Semanal:</span><span className="text-white">{format(subInfo.semanal)}</span></div>
+                <div className="flex justify-between"><span>Mensal:</span><span className="text-white">{format(subInfo.mensal)}</span></div>
+              </>
+            )}
+
+            {/* Detalhes para Juros e Taxas */}
+            {type === "JUROS_A_RECEBER" && (
+              <>
+                <div className="flex justify-between"><span>Juros:</span><span className="text-white">{format(subInfo.juros)}</span></div>
+                <div className="flex justify-between"><span>Taxas:</span><span className="text-blue-400">{format(subInfo.taxas)}</span></div>
+              </>
+            )}
+
+            {/* Detalhes para Montante a Receber */}
+            {type === "MONTANTE_TOTAL" && (
+              <>
+                <div className="flex justify-between"><span>Parcelas (D/S):</span><span className="text-white">{format(subInfo.parcelas)}</span></div>
+                <div className="flex justify-between"><span>Contratos Mensais:</span><span className="text-white">{format(subInfo.mensal)}</span></div>
+              </>
+            )}
+
+            {/* Detalhes para Total Recebido */}
+            {type === "TOTAL_RECEBIDO" && (
+              <>
+                <div className="flex justify-between"><span>Via Parcelas:</span><span className="text-white">{format(subInfo.viaParcelas)}</span></div>
+                <div className="flex justify-between"><span>Via Mensal:</span><span className="text-white">{format(subInfo.viaMensal)}</span></div>
+                <div className="flex justify-between"><span>Taxas/Multas:</span><span className="text-blue-400">{format(subInfo.viaTaxas)}</span></div>
+              </>
+            )}
           </div>
         )}
       </div>

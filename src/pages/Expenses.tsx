@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -33,7 +35,6 @@ import {
   DollarSign,
   CheckCircle2,
   Clock,
-  XCircle,
   AlertTriangle,
   History,
   Info,
@@ -76,7 +77,7 @@ import {
   updateFinanceExpense,
   removeFinanceExpense,
   updateTransactionStatus,
-  getFinanceSummary, // Importado para usar o summary completo
+  getFinanceSummary,
   type FinanceExpense,
   type TransactionStatus,
 } from "@/services/finance";
@@ -115,13 +116,11 @@ const Expenses = () => {
   /* =======================
       QUERIES
   ======================= */
-  // Busca tudo para o cálculo cumulativo histórico
   const { data: allExpenses = [], isLoading: isLoadingAll } = useQuery({
     queryKey: ["finance-expenses-all"],
     queryFn: () => listFinanceExpenses({}),
   });
 
-  // QUERY DO SUMMARY ATUALIZADA
   const { data: financeSummary } = useQuery({
     queryKey: ["finance-summary", range.from, range.to],
     queryFn: () =>
@@ -175,23 +174,13 @@ const Expenses = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["finance-expenses-all"] });
       queryClient.invalidateQueries({ queryKey: ["finance-summary"] });
+      toast({ title: "Status atualizado com sucesso!" });
     },
   });
 
   /* =======================
-      CÁLCULOS
+      FILTROS
   ======================= */
-  const saldoCumulativoTotal = useMemo(() => {
-    return allExpenses.reduce((acc, curr) => {
-      if (curr.status === "CANCELADO") return acc;
-      const valor = Number(curr.valor);
-      if (new Date(curr.dataInicio) <= new Date(range.to)) {
-        return curr.tipo_fluxo === "ENTRADA" ? acc + valor : acc - valor;
-      }
-      return acc;
-    }, 0);
-  }, [allExpenses, range.to]);
-
   const filteredExpenses = useMemo(() => {
     return allExpenses.filter((expense) => {
       const date = new Date(expense.dataInicio);
@@ -211,19 +200,6 @@ const Expenses = () => {
     });
   }, [allExpenses, range, searchTerm, typeFilter, statusFilter]);
 
-  // Totais das Saídas (as entradas agora vêm do Summary da API que inclui os juros)
-  const { totalSaidasPeriodo } = useMemo(() => {
-    return filteredExpenses.reduce(
-      (acc, curr) => {
-        if (curr.status === "CANCELADO") return acc;
-        if (curr.tipo_fluxo === "SAIDA")
-          acc.totalSaidasPeriodo += Number(curr.valor);
-        return acc;
-      },
-      { totalSaidasPeriodo: 0 }
-    );
-  }, [filteredExpenses]);
-
   return (
     <div className="min-h-screen bg-gradient-dark p-6 text-white">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -234,7 +210,7 @@ const Expenses = () => {
               Fluxo de Caixa
             </h1>
             <p className="text-muted-foreground text-sm">
-              Gestão de histórico e projeção financeira
+              Gestão de histórico e caixa real
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -268,28 +244,76 @@ const Expenses = () => {
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* CARD DE ENTRADAS - COM LABEL DE COMPOSIÇÃO */}
+          {/* CARD DE ENTRADAS */}
           <Card className="p-5 bg-card/50 border-white/10 backdrop-blur-sm relative group">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground font-bold uppercase tracking-wider">
                     Entradas Totais
                   </p>
                   <TooltipProvider>
                     <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                      <TooltipTrigger asChild>
+                        <button className="focus:outline-none">
+                          <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
                       </TooltipTrigger>
-                      <TooltipContent className="bg-zinc-900 border-white/10 text-xs">
-                        <p>
-                          Manuais:{" "}
-                          {formatCurrency(financeSummary?.entradasManuais ?? 0)}
-                        </p>
-                        <p>
-                          Juros Contratos:{" "}
-                          {formatCurrency(financeSummary?.jurosPrevistos ?? 0)}
-                        </p>
+                      <TooltipContent className="bg-zinc-900 border-white/10 text-xs p-3 space-y-2">
+                        <div className="border-b border-white/5 pb-1 mb-1">
+                          <p className="text-muted-foreground">
+                            Lançamentos Manuais:
+                          </p>
+                          <p className="flex justify-between gap-4">
+                            <span>Total Entradas:</span>
+                            <span className="text-white">
+                              {formatCurrency(
+                                financeSummary?.entradasManuais ?? 0
+                              )}
+                            </span>
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-bold text-green-400">
+                            Recebimentos (Contratos):
+                          </p>
+                          <p className="flex justify-between gap-4">
+                            <span>Parcelas (D/S):</span>
+                            <span className="text-white">
+                              {formatCurrency(
+                                financeSummary?.detalheContratos?.parcelasDS ??
+                                  0
+                              )}
+                            </span>
+                          </p>
+                          <p className="flex justify-between gap-4">
+                            <span>Mensal:</span>
+                            <span className="text-white">
+                              {formatCurrency(
+                                financeSummary?.detalheContratos?.jurosMensal ??
+                                  0
+                              )}
+                            </span>
+                          </p>
+                          <p className="flex justify-between gap-4">
+                            <span>Taxas/Multas:</span>
+                            <span className="text-blue-400">
+                              {formatCurrency(
+                                financeSummary?.detalheContratos?.taxas ?? 0
+                              )}
+                            </span>
+                          </p>
+                        </div>
+                        <div className="border-t border-white/5 pt-1 mt-1 font-bold">
+                          <p className="flex justify-between gap-4">
+                            <span>Total Pago:</span>
+                            <span className="text-green-400">
+                              {formatCurrency(
+                                financeSummary?.totalEntradas ?? 0
+                              )}
+                            </span>
+                          </p>
+                        </div>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -298,17 +322,20 @@ const Expenses = () => {
                   {formatCurrency(financeSummary?.totalEntradas ?? 0)}
                 </h3>
                 <p className="text-[10px] text-green-500/60 font-medium">
-                  Inclui juros previstos a receber
+                  Efetivado no período
                 </p>
               </div>
               <ArrowUpCircle className="text-green-400 w-5 h-5" />
             </div>
           </Card>
 
+          {/* CARD SAÍDAS */}
           <Card className="p-5 bg-card/50 border-white/10 backdrop-blur-sm">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Saídas</p>
+                <p className="text-sm text-muted-foreground mb-1 font-bold uppercase tracking-wider">
+                  Saídas
+                </p>
                 <h3 className="text-2xl font-bold text-red-400">
                   {formatCurrency(financeSummary?.totalSaidas ?? 0)}
                 </h3>
@@ -317,10 +344,11 @@ const Expenses = () => {
             </div>
           </Card>
 
+          {/* CARD SALDO PERÍODO */}
           <Card className="p-5 bg-card/50 border-white/10 backdrop-blur-sm">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">
+                <p className="text-sm text-muted-foreground mb-1 font-bold uppercase tracking-wider">
                   Saldo Período
                 </p>
                 <h3
@@ -337,14 +365,15 @@ const Expenses = () => {
             </div>
           </Card>
 
+          {/* CARD SALDO CUMULATIVO (CAIXA GLOBAL) */}
           <Card className="p-5 bg-emerald-500/10 border-emerald-500/20 backdrop-blur-sm relative overflow-hidden">
             <div className="relative z-10 flex justify-between items-start">
               <div>
-                <p className="text-sm text-emerald-400 font-medium mb-1">
-                  Saldo Cumulativo
+                <p className="text-sm text-emerald-400 font-bold uppercase tracking-wider mb-1">
+                  Saldo Real (Caixa)
                 </p>
                 <h3 className="text-2xl font-bold">
-                  {formatCurrency(saldoCumulativoTotal)}
+                  {formatCurrency(financeSummary?.saldoCumulativoGlobal ?? 0)}
                 </h3>
               </div>
               <History className="text-emerald-400 w-5 h-5" />
@@ -355,11 +384,12 @@ const Expenses = () => {
           </Card>
         </div>
 
-        {/* TABLE */}
+        {/* TABELA DE HISTÓRICO */}
         <Card className="p-6 bg-card/50 border-white/10 backdrop-blur-md">
           <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
             <h2 className="text-lg font-semibold flex items-center gap-2">
-              <DollarSign className="text-gold w-5 h-5" /> Histórico
+              <DollarSign className="text-gold w-5 h-5" /> Histórico de
+              Lançamentos
             </h2>
             <div className="flex flex-wrap gap-2">
               <div className="relative">
@@ -399,7 +429,7 @@ const Expenses = () => {
             <Table>
               <TableHeader className="bg-white/5">
                 <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="w-[140px]">Situação</TableHead>
+                  <TableHead className="w-[180px]">Situação / Ação</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Valor</TableHead>
@@ -419,10 +449,11 @@ const Expenses = () => {
                     const isOverdue =
                       new Date(expense.dataInicio) < new Date() &&
                       expense.status !== "CONCLUIDO";
+
                     return (
                       <TableRow
                         key={expense.id}
-                        className="border-white/5 hover:bg-white/5 transition-colors"
+                        className="border-white/5 hover:bg-white/5 transition-colors h-16"
                       >
                         <TableCell>
                           <button
@@ -435,31 +466,24 @@ const Expenses = () => {
                                     : "CONCLUIDO",
                               })
                             }
-                            className="group relative"
+                            className="focus:outline-none"
                           >
-                            <div
-                              className={`flex items-center gap-1.5 font-medium text-xs px-2 py-1 rounded-full border transition-all ${
-                                expense.status === "CONCLUIDO"
-                                  ? "text-green-500 bg-green-500/10 border-green-500/20"
-                                  : isOverdue
-                                  ? "text-red-500 bg-red-500/10 border-red-500/30 animate-pulse"
-                                  : "text-yellow-500 bg-yellow-500/10 border-yellow-500/30"
-                              }`}
-                            >
-                              {expense.status === "CONCLUIDO" ? (
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                              ) : (
-                                <Clock className="w-3.5 h-3.5" />
-                              )}
-                              {expense.status === "CONCLUIDO"
-                                ? "Concluído"
-                                : isOverdue
-                                ? "Atrasado"
-                                : "Pendente"}
-                            </div>
-                            {isOverdue && (
-                              <div className="absolute -top-1.5 -left-1.5 bg-red-600 rounded-full p-0.5 border border-card shadow-lg">
-                                <AlertTriangle className="w-2.5 h-2.5 text-white" />
+                            {expense.status === "CONCLUIDO" ? (
+                              <div className="flex items-center gap-1.5 font-medium text-[10px] px-2.5 py-1 rounded-full border border-green-500/20 bg-green-500/10 text-green-500 uppercase">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Pago
+                              </div>
+                            ) : (
+                              <div
+                                className={`flex items-center gap-1.5 font-bold text-[10px] px-3 py-1.5 rounded-md border shadow-lg transition-all uppercase
+                                ${
+                                  isOverdue
+                                    ? "bg-red-600 border-red-400 text-white animate-pulse hover:bg-red-500"
+                                    : "bg-green-600 border-green-400 text-white hover:bg-green-500"
+                                }`}
+                              >
+                                <DollarSign className="w-3.5 h-3.5" />
+                                {isOverdue ? "Pagar Atrasado" : "Pagar Agora"}
                               </div>
                             )}
                           </button>
@@ -497,10 +521,37 @@ const Expenses = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end gap-2">
+                            {/* ATALHO RÁPIDO DE PAGAMENTO (CHECK) */}
+                            {expense.status !== "CONCLUIDO" && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="w-8 h-8 border-green-500/50 bg-green-500/20 hover:bg-green-600 text-green-400 hover:text-white transition-all"
+                                      onClick={() =>
+                                        toggleStatusMutation.mutate({
+                                          id: expense.id,
+                                          status: "CONCLUIDO",
+                                        })
+                                      }
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="bg-green-600 text-white border-none text-[10px]">
+                                    Baixa Rápida
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="w-8 h-8"
                               onClick={() => setDetailsExpense(expense)}
                             >
                               <Eye className="w-4 h-4 text-blue-400" />
@@ -508,6 +559,7 @@ const Expenses = () => {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="w-8 h-8"
                               onClick={() => {
                                 setEditingExpense(expense);
                                 setIsOpen(true);
@@ -518,6 +570,7 @@ const Expenses = () => {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="w-8 h-8"
                               onClick={() => {
                                 setExpenseToDelete(expense);
                                 setDeleteDialogOpen(true);
@@ -537,7 +590,7 @@ const Expenses = () => {
         </Card>
       </div>
 
-      {/* DELETE DIALOG */}
+      {/* DIALOGS DE EXCLUSÃO */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="bg-card border-white/10 text-white">
           <AlertDialogHeader>

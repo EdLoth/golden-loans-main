@@ -39,15 +39,28 @@ export type FinanceExpenseInput = {
   diaDoMes?: number | null;
 };
 
-// Atualizado para refletir os juros previstos dos contratos
-export type FinanceSummary = {
-  totalEntradas: number;      // Manual + Juros
-  entradasManuais: number;    // Apenas personalExpense
-  jurosPrevistos: number;     // Vindo da tabela contract (os 4 mil)
-  totalSaidas: number;
-  saldo: number;
-  quantidade: number;
-};
+/* =========================================================
+   📊 INTERFACE: RESUMO FINANCEIRO (FLUXO DE CAIXA)
+========================================================= */
+export interface FinanceSummaryResponse {
+  // Principais (Cards)
+  totalEntradas: number;           // Entradas Manuais + Pagamentos de Contratos (Realizado)
+  totalSaidas: number;             // Saídas Manuais (Despesas)
+  saldo: number;                   // Diferença do período (totalEntradas - totalSaidas)
+  saldoCumulativoGlobal: number;   // Saldo Total Histórico (Dinheiro no Bolso)
+
+  // Sub-informações (Tooltips / Detalhes)
+  entradasManuais: number;         // Apenas lançamentos manuais de entrada
+  jurosPrevistos: number;          // Total vindo de contratos (DS + Mensal + Taxas) - Valor Realizado
+  
+  detalheContratos: {
+    parcelasDS: number;            // Pago em contratos Diários e Semanais
+    jurosMensal: number;           // Pago em contratos Mensais
+    taxas: number;                 // Valor de taxas e multas pagas no período
+  };
+
+  quantidade: number;              // Contagem de transações manuais no período
+}
 
 /* =======================
     CHAMADAS API
@@ -65,13 +78,17 @@ export async function listFinanceExpenses(params?: {
   return data;
 }
 
-export async function getFinanceSummary(params?: {
-  startDate?: string;
-  endDate?: string;
-}): Promise<FinanceSummary> {
-  const { data } = await api.get("/finance/expenses/summary", { params });
+// Garanta que a função getFinanceSummary use essa interface:
+export const getFinanceSummary = async (params: {
+  startDate: string;
+  endDate: string;
+}): Promise<FinanceSummaryResponse> => {
+  const { data } = await api.get<FinanceSummaryResponse>(
+    "/finance/expenses/summary",
+    { params }
+  );
   return data;
-}
+};
 
 export async function createFinanceExpense(
   payload: FinanceExpenseInput
@@ -92,13 +109,15 @@ export async function updateTransactionStatus(
   id: string,
   status: TransactionStatus
 ): Promise<FinanceExpense> {
-  const { data } = await api.patch(`/finance/expenses/${id}/status`, { status });
+  const { data } = await api.patch(`/finance/expenses/${id}/status`, {
+    status,
+  });
   return data;
 }
 
 export async function removeFinanceExpense(
-  id: string, 
-  mode: 'single' | 'future' | 'all' = 'single'
+  id: string,
+  mode: "single" | "future" | "all" = "single"
 ): Promise<void> {
   await api.delete(`/finance/expenses/${id}`, { params: { mode } });
 }

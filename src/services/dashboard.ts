@@ -1,53 +1,39 @@
 import { api } from "./api";
 
-/* =======================
-   TYPES
-======================= */
-
 export type DashboardRecentContract = {
   id: string;
   clientName: string;
   valorPrincipal: number;
+  jurosCalculados: number;
   vencimentoEm: string;
   status: string;
+  periodicity: "DAILY" | "WEEKLY" | "MONTHLY";
+  totalInstallments: number;
+  paidInstallments: number;
 };
 
 export type DashboardSummary = {
-  totalToReceive: number;
-  activeContracts: number;
-  monthlyInterestForecast: number;
-  totalMontanteToReceive: number;
+  totalEmprestado: number;
+  subTotalEmprestado: { diario: number; semanal: number; mensal: number };
+  jurosETaxasAReceber: number;
+  subJurosAReceber: { juros: number; taxas: number };
+  totalMontanteAReceber: number;
+  subMontanteAReceber: { parcelas: number; mensal: number };
+  totalRecebido: number;
+  subTotalRecebido: {
+    viaParcelas: number;
+    viaMensal: number;
+    viaTaxas: number;
+  };
   recentContracts: DashboardRecentContract[];
 };
 
-/* =======================
-   API CALL
-======================= */
-
-export type DashboardSummaryParams = {
-  startDate: Date | string;
-  endDate: Date | string;
-};
-
-export const getDashboardSummary = async (
-  params: DashboardSummaryParams
-): Promise<DashboardSummary> => {
-  const start =
-    params.startDate instanceof Date
-      ? params.startDate.toISOString()
-      : params.startDate;
-
-  const end =
-    params.endDate instanceof Date
-      ? params.endDate.toISOString()
-      : params.endDate;
-
+export const getDashboardSummary = async (params: {
+  startDate: string;
+  endDate: string;
+}): Promise<DashboardSummary> => {
   const { data } = await api.get<DashboardSummary>("/dashboard/summary", {
-    params: {
-      startDate: start,
-      endDate: end,
-    },
+    params,
   });
-
   return data;
 };

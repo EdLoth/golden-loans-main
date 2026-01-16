@@ -1,52 +1,52 @@
 "use client";
 
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { isBefore, startOfDay, isToday } from "date-fns";
 
 import { Card } from "@/components/ui/card";
 import {
-  TrendingUp,
-  DollarSign,
-  FileText,
-  AlertCircle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Users,
   DollarSignIcon,
+  Calendar,
+  Clock,
+  Loader2,
+  ArrowUpRight,
 } from "lucide-react";
 
-import DateRangePicker, {
-  type DateRange,
-} from "@/components/DateRangePicker";
-import { getDashboardSummary } from "@/services/dashboard";
-
+import DateRangePicker from "@/components/DateRangePicker";
+import {
+  getDashboardSummary,
+  type DashboardRecentContract,
+} from "@/services/dashboard";
+import FinanceSummaryCard from "@/components/FinanceSummaryCard";
 import NewContractSheet from "@/components/NewContractSheet";
 import ClientSheet from "@/components/NewClientSheet";
+import TransactionSheet from "@/components/TransactionsSheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-
-/* =======================
-   GLOBAL DATE RANGE
-======================= */
-
+import { createFinanceExpense } from "@/services/finance";
+import { toast } from "@/hooks/use-toast";
 import { useDateRange } from "@/hooks/useDateRange";
 
-/* =======================
-   COMPONENT
-======================= */
-
 const Dashboard = () => {
+  const queryClient = useQueryClient();
   const { range, setRange } = useDateRange();
-
-  const canFetch = useMemo(() => {
-    if (!range.from || !range.to) return false;
-
-    const from = new Date(range.from);
-    const to = new Date(range.to);
-
-    return (
-      !Number.isNaN(from.getTime()) &&
-      !Number.isNaN(to.getTime()) &&
-      from <= to
-    );
-  }, [range]);
+  const [isExpenseSheetOpen, setIsExpenseSheetOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-summary", range.from, range.to],
@@ -55,237 +55,250 @@ const Dashboard = () => {
         startDate: new Date(range.from).toISOString(),
         endDate: new Date(range.to).toISOString(),
       }),
-    enabled: canFetch,
+    enabled: !!(range.from && range.to),
   });
 
-  const formatCurrency = (value: number) =>
+  const saveExpenseMutation = useMutation({
+    mutationFn: (payload: any) => createFinanceExpense(payload),
+    onSuccess: () => {
+      toast({ title: "Gasto registrado!" });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setIsExpenseSheetOpen(false);
+    },
+  });
+
+  const formatCurrency = (v: number) =>
     new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(value);
+    }).format(v);
 
-  if (isLoading || !data) {
+  const getBadge = (type: string) => {
+    const config: any = {
+      DAILY: {
+        label: "Diário",
+        class: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      },
+      WEEKLY: {
+        label: "Semanal",
+        class: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+      },
+      MONTHLY: {
+        label: "Mensal",
+        class: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+      },
+    };
     return (
-      <div className="min-h-screen bg-gradient-dark p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* HEADER LOADING */}
-          <div className="flex items-center justify-between animate-pulse">
-            <div className="space-y-2">
-              <div className="h-8 w-48 bg-muted rounded-md" />
-              <div className="h-4 w-32 bg-muted/50 rounded-md" />
-            </div>
-            <div className="h-10 w-64 bg-muted rounded-md" />
-          </div>
+      config[type] || {
+        label: type,
+        class: "bg-gray-500/10 text-gray-400 border-white/10",
+      }
+    );
+  };
 
-          {/* STATS LOADING - 4 CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="p-6 bg-card/50 border-primary/20 shadow-lg animate-pulse">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-3 flex-1">
-                    <div className="h-4 w-24 bg-muted rounded" />
-                    <div className="h-8 w-32 bg-muted rounded" />
-                    <div className="h-4 w-16 bg-muted rounded" />
-                  </div>
-                  <div className="w-12 h-12 rounded-lg bg-muted flex-shrink-0" />
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          {/* CONTENT GRID LOADING */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* RECENT CONTRACTS SKELETON */}
-            <Card className="lg:col-span-2 p-6 bg-card/50 border-primary/20 shadow-lg animate-pulse">
-              <div className="flex items-center justify-between mb-6">
-                <div className="h-6 w-40 bg-muted rounded" />
-                <div className="h-5 w-5 bg-muted rounded" />
-              </div>
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-muted/20">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-muted" />
-                      <div className="space-y-2">
-                        <div className="h-4 w-32 bg-muted rounded" />
-                        <div className="h-3 w-20 bg-muted rounded" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-4 w-24 bg-muted rounded ml-auto" />
-                      <div className="h-3 w-16 bg-muted rounded ml-auto" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* QUICK ACTIONS SKELETON */}
-            <Card className="p-6 bg-card/50 border-primary/20 shadow-lg animate-pulse">
-              <div className="h-6 w-32 bg-muted rounded mb-6" />
-              <div className="space-y-3">
-                <div className="h-[60px] w-full bg-muted rounded-lg" />
-                <div className="h-[60px] w-full bg-muted rounded-lg" />
-                <div className="h-[60px] w-full bg-muted rounded-lg" />
-              </div>
-            </Card>
-          </div>
-        </div>
+  if (isLoading || !data)
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary" />
       </div>
     );
-  }
-
-  const stats = [
-    {
-      title: "Total Emprestado",
-      value: formatCurrency(data.totalToReceive),
-      icon: DollarSign,
-      trend: "Em aberto",
-      trendUp: true,
-    },
-    {
-      title: "Contratos Ativos",
-      value: String(data.activeContracts),
-      icon: FileText,
-      trend: "Ativos",
-      trendUp: true,
-    },
-    {
-      title: "Previsão de Juros",
-      value: formatCurrency(data.monthlyInterestForecast),
-      icon: TrendingUp,
-      trend: "No período",
-      trendUp: true,
-    },
-    {
-      title: "Montante a Receber",
-      value: formatCurrency(data.totalMontanteToReceive),
-      icon: AlertCircle,
-      trend: "No período",
-      trendUp: data.totalMontanteToReceive > 0,
-    },
-  ];
 
   return (
-    <div className="min-h-screen bg-gradient-dark p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* HEADER */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
-              Visão geral do sistema
+    <div className="min-h-screen bg-gradient-dark p-6 text-white">
+      <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-extrabold tracking-tighter font-premium">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground text-sm font-medium">
+              Resumo de Ativos e Operações
             </p>
           </div>
-
-          {/* 🔥 FILTRO GLOBAL */}
           <DateRangePicker value={range} onApply={setRange} />
         </div>
 
-        {/* STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat, index) => (
-            <Card
-              key={index}
-              className="p-6 bg-card/50 border-primary/20 shadow-lg"
-            >
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    {stat.title}
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stat.value}
-                  </p>
-                  <span
-                    className={`text-sm font-medium ${
-                      stat.trendUp ? "text-primary" : "text-accent"
-                    }`}
-                  >
-                    {stat.trend}
-                  </span>
-                </div>
-
-                <div className="w-12 h-12 rounded-lg bg-gradient-gold flex items-center justify-center shadow-gold">
-                  <stat.icon className="w-6 h-6 text-primary-foreground" />
-                </div>
-              </div>
-            </Card>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <FinanceSummaryCard
+            type="TOTAL_EMPRESTADO"
+            value={data.totalEmprestado}
+            subInfo={data.subTotalEmprestado}
+          />
+          <FinanceSummaryCard
+            type="JUROS_A_RECEBER"
+            value={data.jurosETaxasAReceber}
+            subInfo={data.subJurosAReceber}
+          />
+          <FinanceSummaryCard
+            type="MONTANTE_TOTAL"
+            value={data.totalMontanteAReceber}
+            subInfo={data.subMontanteAReceber}
+          />
+          <FinanceSummaryCard
+            type="TOTAL_RECEBIDO"
+            value={data.totalRecebido}
+            subInfo={data.subTotalRecebido}
+          />
         </div>
 
-        {/* RECENT CONTRACTS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 p-6 bg-card/50 border-primary/20 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-foreground">
-                Contratos Recentes
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="lg:col-span-2 p-6 bg-card/40 border-white/5 shadow-2xl backdrop-blur-md overflow-hidden">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="p-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                <Clock className="w-5 h-5 text-orange-500" />
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Próximos Vencimentos
               </h2>
-              <FileText className="w-5 h-5 text-primary" />
             </div>
 
-            <div className="space-y-4">
-              {data.recentContracts.length === 0 && (
-                <p className="text-muted-foreground">
-                  Nenhum contrato no período
-                </p>
-              )}
+            <div className="rounded-xl border border-white/10 overflow-hidden bg-black/20">
+              <Table>
+                <TableHeader className="bg-white/[0.03]">
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead className="text-white font-bold h-12">
+                      Cliente / Tipo
+                    </TableHead>
+                    <TableHead className="text-white font-bold">
+                      Principal
+                    </TableHead>
+                    <TableHead className="text-white font-bold">
+                      Juros/Lucro
+                    </TableHead>
+                    <TableHead className="text-white font-bold text-center">
+                      Parcelas
+                    </TableHead>
+                    <TableHead className="text-white font-bold">
+                      Vencimento
+                    </TableHead>
+                    <TableHead className="text-right text-white font-bold pr-6">
+                      Situação
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.recentContracts.map(
+                    (contract: DashboardRecentContract) => {
+                      const venc = new Date(contract.vencimentoEm);
+                      const isVencendoHoje = isToday(venc);
+                      const isOverdue =
+                        isBefore(venc, startOfDay(new Date())) &&
+                        contract.status !== "QUITADO";
+                      const badge = getBadge(contract.periodicity);
 
-              {data.recentContracts.map((contract) => (
-                <div
-                  key={contract.id}
-                  className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-border/50"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-gold flex items-center justify-center">
-                      <Users className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {contract.clientName}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(contract.vencimentoEm).toLocaleDateString(
-                          "pt-BR"
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="font-semibold text-primary">
-                      {formatCurrency(contract.valorPrincipal)}
-                    </p>
-                    <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
-                      {contract.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                      return (
+                        <TableRow
+                          key={contract.id}
+                          className="border-white/5 hover:bg-white/[0.04] transition-all h-16"
+                        >
+                          <TableCell className="pl-6">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-bold text-sm text-white">
+                                {contract.clientName}
+                              </span>
+                              <span
+                                className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border w-fit ${badge.class}`}
+                              >
+                                {badge.label}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm font-semibold text-gray-200">
+                            {formatCurrency(contract.valorPrincipal)}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm font-bold text-emerald-400">
+                            <div className="flex items-center gap-1">
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                              {formatCurrency(contract.jurosCalculados)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {contract.periodicity !== "MONTHLY" ? (
+                              <span className="text-[11px] font-black bg-white/5 px-2 py-1 rounded text-blue-400 border border-white/10">
+                                {contract.paidInstallments}/
+                                {contract.totalInstallments}
+                              </span>
+                            ) : (
+                              <span className="text-gray-600">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div
+                              className={`flex items-center gap-2 text-xs font-bold ${
+                                isOverdue
+                                  ? "text-red-400"
+                                  : isVencendoHoje
+                                  ? "text-blue-400"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                              {venc.toLocaleDateString("pt-BR")}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right pr-6">
+                            <span
+                              className={`text-[9px] px-2.5 py-1 rounded-md font-black uppercase tracking-widest border ${
+                                isOverdue
+                                  ? "bg-red-600 border-red-400 text-white animate-pulse"
+                                  : isVencendoHoje
+                                  ? "bg-blue-600 border-blue-400 text-white"
+                                  : "bg-white/5 border-white/10 text-gray-500"
+                              }`}
+                            >
+                              {isOverdue
+                                ? "Atrasado"
+                                : isVencendoHoje
+                                ? "Vence Hoje"
+                                : contract.status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </Card>
 
-          {/* QUICK ACTIONS */}
-          <Card className="p-6 bg-card/50 border-primary/20 shadow-lg">
-            <h2 className="text-xl font-semibold text-foreground mb-6">
+          <Card className="p-7 bg-card/40 border-white/5 shadow-2xl backdrop-blur-md">
+            <h2 className="text-xl font-bold mb-8 flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                <DollarSignIcon className="w-5 h-5 text-primary" />
+              </div>
               Ações Rápidas
             </h2>
-
-            <div className="space-y-3">
+            <div className="space-y-4">
               <NewContractSheet
-                triggerLabel="Novo Contrato"
-                classButton="w-full p-4 py-7 text-white rounded-lg bg-secondary border border-border/50"
+                triggerLabel="Novo Empréstimo"
+                classButton="w-full p-4 py-8 text-white rounded-2xl bg-secondary border border-white/5 hover:bg-secondary/80 transition-all font-bold shadow-lg"
               />
-
               <ClientSheet
                 triggerLabel="Cadastrar Cliente"
-                classButton="w-full p-4 py-7 text-white rounded-lg bg-secondary border border-border/50"
+                classButton="w-full p-4 py-8 text-white rounded-2xl bg-secondary border border-white/5 hover:bg-secondary/80 transition-all font-bold shadow-lg"
               />
-
-              <Button className="w-full p-4 py-7 text-white rounded-lg bg-secondary border border-border/50">
-                <DollarSignIcon className="w-5 h-5" />
-                Registrar Gasto
-              </Button>
+              <Sheet
+                open={isExpenseSheetOpen}
+                onOpenChange={setIsExpenseSheetOpen}
+              >
+                <SheetTrigger asChild>
+                  <Button className="w-full p-4 py-8 text-white rounded-2xl bg-secondary border border-white/5 hover:bg-secondary/80 transition-all font-bold shadow-lg">
+                    <DollarSignIcon className="w-5 h-5 mr-2 text-red-500" />
+                    Registrar Saída
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="bg-card text-white border-white/10 sm:max-w-lg">
+                  <SheetHeader>
+                    <SheetTitle className="text-white text-2xl font-premium">
+                      Nova Saída
+                    </SheetTitle>
+                  </SheetHeader>
+                  <TransactionSheet
+                    onSave={(d) => saveExpenseMutation.mutate(d)}
+                  />
+                </SheetContent>
+              </Sheet>
             </div>
           </Card>
         </div>

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Banknote, Mail, Lock } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowRight } from "lucide-react"; // Adicionei ArrowRight e Loader2
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth";
 
@@ -24,16 +23,17 @@ const Login = () => {
       const user = await authService.login(email, password);
 
       toast({
-        title: "Login realizado com sucesso",
-        description: `Bem-vindo, ${user.nome}`,
+        title: "Acesso concedido",
+        description: `Bem-vindo de volta, ${user.nome}!`,
+        className: "border-primary/50 text-primary",
       });
 
       navigate("/dashboard");
     } catch (err: any) {
       toast({
-        title: "Erro ao fazer login",
+        title: "Falha na autenticação",
         description:
-          err?.response?.data?.message ?? "E-mail ou senha inválidos",
+          err?.response?.data?.message ?? "Verifique suas credenciais e tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -42,71 +42,134 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-dark relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,hsl(43,59%,51%,0.1),transparent_50%)]" />
-      <div className="absolute top-20 right-20 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 left-20 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+    <div className="w-full min-h-screen lg:grid lg:grid-cols-2 bg-zinc-950 text-white overflow-hidden">
+      
+      {/* --- PAINEL ESQUERDO (VISUAL & MARCA) --- */}
+      <div className="hidden lg:flex relative flex-col justify-between p-12 bg-zinc-900 border-r border-white/5">
+        {/* Efeitos de Fundo (Glows) */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-amber-600/10 rounded-full blur-[120px]" />
+        </div>
 
-      <Card className="w-full max-w-md p-8 bg-card/95 backdrop-blur-sm border-primary/20 shadow-elevated relative z-10">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 rounded-full bg-gradient-gold rounded-full flex items-center justify-center mb-4 shadow-gold">
-            <img src="/logo.jpeg" className="w-24 rounded-full" alt="" />
+        {/* Logo Header */}
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-700 p-0.5 shadow-lg shadow-amber-500/20">
+            <img src="/logo.jpeg" className="w-full h-full rounded-full object-cover" alt="Logo" />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-gold bg-clip-text text-transparent">
-            Gestão Andrade
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Empréstimos, Contratos & Gestão Financeira
+          <span className="text-xl font-bold tracking-tight text-white">Gestão Andrade</span>
+        </div>
+
+        {/* Conteúdo Central/Inferior */}
+        <div className="relative z-10 space-y-6 max-w-lg">
+          <h2 className="text-4xl font-extrabold tracking-tight leading-tight">
+            Gerencie seus ativos com <br />
+            <span className="bg-gradient-to-r from-amber-200 to-yellow-500 bg-clip-text text-transparent">
+              Excelência e Segurança.
+            </span>
+          </h2>
+          <p className="text-zinc-400 text-lg">
+            Plataforma completa para controle de empréstimos, gestão de contratos e análise financeira em tempo real.
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="email">E-mail</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full bg-gradient-gold"
-            disabled={isLoading}
-          >
-            {isLoading ? "Entrando..." : "Entrar"}
-          </Button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground">
-          <p>Sistema protegido com autenticação JWT</p>
+        {/* Footer do Painel */}
+        <div className="relative z-10">
+          <p className="text-xs text-zinc-500">© 2024 Andrade Financeira. Todos os direitos reservados.</p>
         </div>
-      </Card>
+      </div>
+
+      {/* --- PAINEL DIREITO (FORMULÁRIO) --- */}
+      <div className="flex items-center justify-center p-8 bg-zinc-950 relative">
+        {/* Glow Mobile (só aparece em telas pequenas) */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[100px] lg:hidden" />
+
+        <div className="w-full max-w-[400px] space-y-8 relative z-10">
+          
+          {/* Cabeçalho do Form */}
+          <div className="text-center lg:text-left space-y-2">
+            <div className="lg:hidden flex justify-center mb-6">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-yellow-700 p-0.5 shadow-xl shadow-amber-500/20">
+                    <img src="/logo.jpeg" className="w-full h-full rounded-full object-cover" alt="Logo" />
+                </div>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-white">Acesse sua conta</h1>
+            <p className="text-zinc-400">Entre com suas credenciais para continuar.</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            
+            {/* Campo E-mail */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-zinc-300">E-mail Corporativo</Label>
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-amber-400 transition-colors">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@andrade.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 h-12 bg-zinc-900/50 border-zinc-800 focus:border-amber-500/50 focus:ring-amber-500/20 transition-all placeholder:text-zinc-600 text-zinc-100"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Campo Senha */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-zinc-300">Senha</Label>
+                <a href="#" className="text-xs text-amber-500 hover:text-amber-400 transition-colors">
+                  Esqueceu a senha?
+                </a>
+              </div>
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-amber-400 transition-colors">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 h-12 bg-zinc-900/50 border-zinc-800 focus:border-amber-500/50 focus:ring-amber-500/20 transition-all placeholder:text-zinc-600 text-zinc-100"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Botão de Ação */}
+            <Button
+              type="submit"
+              className="w-full h-12 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-black font-bold shadow-lg shadow-amber-900/20 transition-all duration-300 transform hover:scale-[1.02]"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Autenticando...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span>Entrar no Sistema</span>
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+              )}
+            </Button>
+          </form>
+
+          {/* Footer Mobile/Extra */}
+          <div className="text-center">
+            <p className="text-xs text-zinc-600">
+              Protegido por criptografia de ponta a ponta.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
