@@ -64,6 +64,12 @@ const calcularVencimento = (periodicidade: string) => {
   return vencimento.toISOString();
 };
 
+// ✅ CORREÇÃO DO FUSO
+const parseDateInputToISO = (date: string) => {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toISOString();
+};
+
 /* =======================
    COMPONENT
 ======================= */
@@ -88,6 +94,7 @@ const NewContractSheet = ({
     valorPrincipal: "",
     jurosPercent: "40",
     periodicidade: "MENSAL",
+    dataInicio: "",
     historico: "",
   });
 
@@ -114,6 +121,9 @@ const NewContractSheet = ({
         jurosPercent: Number(formData.jurosPercent),
         vencimentoEm: calcularVencimento(formData.periodicidade),
         periodicity: mapPeriodicityToEnum(formData.periodicidade),
+        dataInicio: formData.dataInicio
+          ? parseDateInputToISO(formData.dataInicio)
+          : undefined,
         historico: formData.historico || undefined,
       });
 
@@ -125,10 +135,16 @@ const NewContractSheet = ({
         valorPrincipal: "",
         jurosPercent: "40",
         periodicidade: "MENSAL",
+        dataInicio: "",
         historico: "",
       });
 
+      // ATUALIZAÇÃO DOS DADOS APÓS CRIAÇÃO
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      // Atualiza os cards de resumo financeiro (Total Emprestado aumenta)
+      queryClient.invalidateQueries({ queryKey: ["finance-summary"] });
+      // Atualiza a tabela de pagamentos do período
+      queryClient.invalidateQueries({ queryKey: ["payments-period"] });
     } catch {
       toast({
         title: "Erro ao criar contrato",
@@ -226,6 +242,18 @@ const NewContractSheet = ({
                 <SelectItem value="MENSAL">Mensal</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* DATA INÍCIO */}
+          <div className="space-y-2">
+            <Label>Data de início</Label>
+            <Input
+              type="date"
+              value={formData.dataInicio}
+              onChange={(e) =>
+                setFormData({ ...formData, dataInicio: e.target.value })
+              }
+            />
           </div>
 
           {/* HISTÓRICO */}

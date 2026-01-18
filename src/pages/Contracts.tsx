@@ -27,10 +27,10 @@ import {
   CreditCard,
   History,
   Loader2,
-  ArrowDownCircle,
   MessageSquareShare,
   CalendarClock,
-  Trash2, // Adicionado
+  Trash2,
+  RefreshCcw, // Ícone adicionado
 } from "lucide-react";
 
 import {
@@ -53,7 +53,7 @@ import {
   listContracts,
   type Contract,
   notifyContractClient,
-  deleteContract, // Importando o novo serviço de deleção
+  deleteContract,
 } from "@/services/contracts";
 import { getFinanceSummary, getPaymentsByPeriod } from "@/services/payment";
 
@@ -76,6 +76,7 @@ const Contracts = () => {
     null
   );
   const [historyContract, setHistoryContract] = useState<Contract | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   /* ===== DATA FETCHING PREP ===== */
   const canFetch = useMemo(() => !!(range.from && range.to), [range]);
@@ -96,24 +97,49 @@ const Contracts = () => {
   /* =======================
       QUERIES
   ======================= */
-  const { data: contracts = [], isLoading: isLoadingContracts } = useQuery({
+  const {
+    data: contracts = [],
+    isLoading: isLoadingContracts,
+    isRefetching: isRefetchingContracts,
+  } = useQuery({
     queryKey: ["contracts", dates.start, dates.end],
     queryFn: () =>
       listContracts({ startDate: dates.start, endDate: dates.end }),
     enabled: canFetch,
   });
 
-  const { data: financeSummary } = useQuery({
+  const { data: financeSummary, isRefetching: isRefetchingSummary } = useQuery({
     queryKey: ["finance-summary", dates.start, dates.end],
     queryFn: () => getFinanceSummary(dates.start, dates.end),
     enabled: canFetch,
   });
 
-  const { data: payments = [], isLoading: isLoadingPayments } = useQuery({
+  const {
+    data: payments = [],
+    isLoading: isLoadingPayments,
+    isRefetching: isRefetchingPayments,
+  } = useQuery({
     queryKey: ["payments-period", dates.start, dates.end],
     queryFn: () => getPaymentsByPeriod(dates.start, dates.end),
     enabled: canFetch,
   });
+
+  const isGlobalLoading =
+    isRefetchingContracts || isRefetchingSummary || isRefetchingPayments;
+
+  /* =======================
+      REFETCH MANUAL
+  ======================= */
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["contracts"] }),
+      queryClient.invalidateQueries({ queryKey: ["finance-summary"] }),
+      queryClient.invalidateQueries({ queryKey: ["payments-period"] }),
+    ]);
+    setTimeout(() => setIsRefreshing(false), 500); // Pequeno delay visual
+    toast.info("Dados atualizados.");
+  };
 
   /* =======================
       MUTATIONS
@@ -136,9 +162,7 @@ const Contracts = () => {
     mutationFn: (id: string) => deleteContract(id),
     onSuccess: () => {
       toast.success("Contrato e dados vinculados excluídos permanentemente.");
-      queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["payments-period"] });
+      handleManualRefresh();
     },
     onError: () => {
       toast.error("Erro ao tentar excluir o contrato.");
@@ -201,6 +225,23 @@ const Contracts = () => {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <DateRangePicker value={range} onApply={setRange} />
+            
+            {/* BOTÃO DE ATUALIZAR MANUALMENTE */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+              onClick={handleManualRefresh}
+              disabled={isGlobalLoading || isRefreshing}
+              title="Atualizar dados"
+            >
+              <RefreshCcw
+                className={`w-4 h-4 ${
+                  isGlobalLoading || isRefreshing ? "animate-spin" : ""
+                }`}
+              />
+            </Button>
+
             <NewContractSheet classButton="text-sm font-bold bg-gradient-gold text-black border-none" />
           </div>
         </div>
@@ -344,48 +385,6 @@ const Contracts = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {/* BOTÃO EXCLUIR COM ALERTA */}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
-                                  title="Excluir Contrato"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="bg-[#071e30] border-white/10 text-white">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Deseja excluir permanentemente?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription className="text-gray-400">
-                                    Esta ação não pode ser desfeita. Você irá
-                                    apagar o contrato de{" "}
-                                    <strong>{c.client?.nome}</strong>, todo o
-                                    histórico de pagamentos registrados{" "}
-                                    {hasInstallments
-                                      ? "e todas as parcelas geradas"
-                                      : ""}
-                                    .
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel className="bg-white/5 border-none hover:bg-white/10">
-                                    Cancelar
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-red-600 hover:bg-red-700"
-                                    onClick={() => deleteMutation.mutate(c.id)}
-                                  >
-                                    Confirmar Exclusão
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-
                             {/* NOTIFICAR WHATSAPP */}
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -448,6 +447,48 @@ const Contracts = () => {
                             >
                               <CreditCard className="w-4 h-4" />
                             </Button>
+
+                            {/* BOTÃO EXCLUIR COM ALERTA */}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                  title="Excluir Contrato"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="bg-[#071e30] border-white/10 text-white">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Deseja excluir permanentemente?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription className="text-gray-400">
+                                    Esta ação não pode ser desfeita. Você irá
+                                    apagar o contrato de{" "}
+                                    <strong>{c.client?.nome}</strong>, todo o
+                                    histórico de pagamentos registrados{" "}
+                                    {hasInstallments
+                                      ? "e todas as parcelas geradas"
+                                      : ""}
+                                    .
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel className="bg-white/5 border-none hover:bg-white/10">
+                                    Cancelar
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-red-600 hover:bg-red-700"
+                                    onClick={() => deleteMutation.mutate(c.id)}
+                                  >
+                                    Confirmar Exclusão
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -458,9 +499,6 @@ const Contracts = () => {
             </Table>
           </div>
         </Card>
-
-        {/* TABELA 2: ENTRADAS DE CAIXA (MANTIDA) */}
-        {/* ... restante do código das entradas de caixa ... */}
       </div>
 
       <PaymentContractModal
@@ -469,8 +507,7 @@ const Contracts = () => {
         onClose={() => setSelectedContract(null)}
         onUpdatedContract={() => {
           setSelectedContract(null);
-          queryClient.invalidateQueries({ queryKey: ["contracts"] });
-          queryClient.invalidateQueries({ queryKey: ["finance-summary"] });
+          handleManualRefresh();
         }}
       />
       <PaymentHistoryModal

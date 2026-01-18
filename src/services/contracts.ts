@@ -109,8 +109,10 @@ export type ContractInput = {
 
   periodicity: ContractPeriodicity;
 
+  dataInicio?: string; // 👈 novo campo opcional
   historico?: string;
 };
+
 
 /* =======================
     API CALLS
@@ -176,7 +178,7 @@ export const getContractsByClient = async (
 
 
 export async function deleteContract(id: string) {
-  const { data } = await api.delete(`/contracts/${id}`);
+  const { data } = await api.delete(`/contract/${id}`);
   return data;
 }
 
